@@ -18,7 +18,7 @@ st.set_page_config(
 # ==========================================
 # BACKEND FUNCTIONS (Placeholders for your models)
 # ==========================================
-# Implement the solution using functions for modularity
+# Implement the solution using functions for modularity[cite: 1]
 
 def get_image_caption(image):
     """Uses a pre-trained model to generate a caption from the uploaded image[cite: 1]."""
@@ -55,13 +55,23 @@ st.title("🪄 The Magic Story Machine 🐉")
 st.info("Put a picture in the machine and watch it turn into a magical story!")
 
 # 2. The Magic Portal (Image Input)
-# Users upload an image[cite: 1]
-uploaded_file = st.file_uploader("Upload your drawing or photo here!", type=["jpg", "jpeg", "png"])
+st.markdown("### 📸 How to add your picture:")
+
+# Create two columns to show the options clearly
+col1, col2 = st.columns(2)
+with col1:
+    st.info("**Option 1: Upload a file** \n\nClick the 'Browse files' button below to pick a saved drawing.")
+with col2:
+    # Explicitly mentioning Mac and Windows shortcuts for easy pasting
+    st.success("**Option 2: Paste a Screenshot!** \n\nTake a screenshot, click the dashed box below, and press **Cmd+V** (or **Ctrl+V**) to paste it like magic! ✨")
+
+# The uploader will automatically accept the pasted image[cite: 1]
+uploaded_file = st.file_uploader("Drop, upload, or PASTE your picture here!", type=["jpg", "jpeg", "png"], label_visibility="collapsed")
 
 if uploaded_file is not None:
-    # Display the uploaded image back to the user
+    # Display the uploaded/pasted image back to the user
     image = Image.open(uploaded_file)
-    st.image(image, caption="Your beautiful picture!", use_container_width=True)
+    st.image(image, caption="Wow! What a great picture!", use_container_width=True)
     
     # 3. The "Make My Story" Button
     if st.button("✨ Make My Story! ✨", use_container_width=True):
