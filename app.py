@@ -1,4 +1,4 @@
 import streamlit as st
 
-st.title("Welcome to Mickey Mighty House!")
-st.title("_Streamlit_ is :blue[cool] :sunglasses:")
+st.title("Welcome to Mickey Magic House!")
+st.title("Home is behind, and the world's ahead.")
