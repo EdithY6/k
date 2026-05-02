@@ -1,3 +1,3 @@
 import streamlit as sl
 
-sl.write('Yes, you're in')
+sl.write("Yes, you're in.")
