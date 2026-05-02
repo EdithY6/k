@@ -1,3 +1,4 @@
 import streamlit as sl
 
-sl.write("Yes, you're in.")
+st.title("Welcome to Mickey Mighty House!")
+st.title("_Streamlit_ is :blue[cool] :sunglasses:")
