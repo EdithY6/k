@@ -64,7 +64,8 @@ if uploaded_file is not None:
     sample_rate = audio_data["sampling_rate"]
     
     # st.audio has its own built-in play button UI
-    st.audio(audio_array, sample_rate=sample_rate)    st.write(f"**Story:** {story}")
+    st.audio(audio_array, sample_rate=sample_rate)    
+    st.write(f"**Story:** {story}")
 
     # Stage 3: Story to Audio (Inline)
     st.text('Generating audio data...')
