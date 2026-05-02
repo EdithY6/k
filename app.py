@@ -1,6 +1,6 @@
 # Program title: Storytelling App
 
-pip install transformers
+
 # Import part
 import streamlit as st
 from transformers import pipeline
