@@ -7,29 +7,23 @@ import time
 # import os
 
 # ==========================================
-# PAGE CONFIGURATION (Must be the first Streamlit command)
+# PAGE CONFIGURATION
 # ==========================================
 st.set_page_config(
-    page_title="Magic Story Machine",
+    page_title="Magic Story Chat",
     page_icon="🪄",
     layout="centered"
 )
 
 # ==========================================
-# BACKEND FUNCTIONS (Placeholders for your models)
+# BACKEND FUNCTIONS (Placeholders)
 # ==========================================
-# Implement the solution using functions for modularity[cite: 1]
-
 def get_image_caption(image):
-    """Uses a pre-trained model to generate a caption from the uploaded image[cite: 1]."""
-    # TODO: Initialize Salesforce/blip-image-captioning-base pipeline here
-    time.sleep(2) # Simulating model loading time
+    time.sleep(2) 
     return "a brave dog wearing a red cape flying through the sky"
 
 def generate_story(caption):
-    """Uses a text-generation model to expand the caption into a full story (50-100 words)[cite: 1]."""
-    # TODO: Initialize text-generation pipeline here (e.g., GPT-2 or similar)
-    time.sleep(2) # Simulating model loading time
+    time.sleep(2) 
     return (
         "Once upon a time, there was a brave dog named Barnaby. "
         "He wasn't an ordinary dog; he had a magical red cape! "
@@ -39,45 +33,43 @@ def generate_story(caption):
     )
 
 def create_voiceover(text):
-    """Converts the generated text into speech using a TTS model[cite: 1]."""
-    # TODO: Implement pyttsx3, gTTS, or a Hugging Face TTS model here
-    time.sleep(2) # Simulating processing time
-    # For now, we will just return a dummy audio path. 
-    # In reality, save your audio to a file like 'story.mp3' and return that filename.
+    time.sleep(2) 
     return None 
 
 # ==========================================
-# USER INTERFACE
+# USER INTERFACE: CHAT LAYOUT
 # ==========================================
 
-# 1. The Welcome Banner
-st.title("🪄 The Magic Story Machine 🐉")
-st.info("Put a picture in the machine and watch it turn into a magical story!")
+st.title("🪄 Magic Story Chat 🐉")
 
-# 2. The Magic Portal (Image Input)
-st.markdown("### 📸 How to add your picture:")
+# 1. The Assistant's Welcome Message
+with st.chat_message("assistant"):
+    st.write("Hello! I am the Magic Story Machine.")
+    st.info("💡 **Pro-Tip:** Just click ANYWHERE on the blank background of this page and press **Cmd+V** to paste your screenshot!")
 
-# Create two columns to show the options clearly
-col1, col2 = st.columns(2)
-with col1:
-    st.info("**Option 1: Upload a file** \n\nClick the 'Browse files' button below to pick a saved drawing.")
-with col2:
-    # Explicitly mentioning Mac and Windows shortcuts for easy pasting
-    st.success("**Option 2: Paste a Screenshot!** \n\nTake a screenshot, click the dashed box below, and press **Cmd+V** (or **Ctrl+V**) to paste it like magic! ✨")
+# 2. Hidden Uploader (Catches the pasted image behind the scenes)
+uploaded_file = st.file_uploader("Upload", type=["jpg", "jpeg", "png"], label_visibility="hidden")
 
-# The uploader will automatically accept the pasted image[cite: 1]
-uploaded_file = st.file_uploader("Drop, upload, or PASTE your picture here!", type=["jpg", "jpeg", "png"], label_visibility="collapsed")
+# 3. The Chat Input (Provides the visual chatbox feel)
+user_text = st.chat_input("Or type a message to the machine here...")
 
+if user_text:
+    # If they type text instead of pasting an image, remind them how it works
+    with st.chat_message("user"):
+        st.write(user_text)
+    with st.chat_message("assistant"):
+        st.write("I love chatting, but I'm best at telling stories! Please paste a picture (Cmd+V) anywhere on the screen so I can get to work.")
+
+# 4. Processing the Pasted Image
 if uploaded_file is not None:
-    # Display the uploaded/pasted image back to the user
-    image = Image.open(uploaded_file)
-    st.image(image, caption="Wow! What a great picture!", use_container_width=True)
-    
-    # 3. The "Make My Story" Button
-    if st.button("✨ Make My Story! ✨", use_container_width=True):
+    # Display the user's action
+    with st.chat_message("user"):
+        image = Image.open(uploaded_file)
+        st.image(image, width=300, caption="Can you make a story out of this?")
         
-        # 4. The "Thinking" Phase (Processing States)
-        with st.status("The Machine is working its magic...", expanded=True) as status:
+    # Display the Assistant's response
+    with st.chat_message("assistant"):
+        with st.status("Working my magic...", expanded=True) as status:
             
             st.write("👀 Looking closely at your picture...")
             caption = get_image_caption(image)
@@ -90,17 +82,12 @@ if uploaded_file is not None:
             
             status.update(label="✨ Your story is ready!", state="complete", expanded=False)
         
-        # 5. The Storybook Output
-        st.success("Tada! Here is your adventure:")
-        
-        # Display the narrative[cite: 1]
+        # Output the final generated content
         st.markdown(f"### {story_text}")
         
-        # Display the audio format[cite: 1]
         if audio_file:
             st.audio(audio_file, format="audio/mp3")
         else:
             st.warning("(Audio player will appear here once TTS is connected!)")
             
-        # The "Wow" Factor
         st.balloons()
