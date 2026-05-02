@@ -11,7 +11,8 @@ def load_image_model():
 
 @st.cache_resource
 def load_story_model():
-    return pipeline("text-generation", model="pranavpsv/genre-story-generator-v2")
+    # Option 1 applied: Swap to an instruction-following model
+    return pipeline("text2text-generation", model="google/flan-t5-base")
 
 @st.cache_resource
 def load_audio_model():
@@ -33,11 +34,25 @@ def process_image_to_text(image):
 # 2. STORY GENERATION FUNCTION
 # ==========================================
 def generate_story(scenario):
-    """Takes the text scenario, generates a short story, and returns the text."""
+    """Takes the text scenario, generates a short G-rated story, and returns the text."""
     story_pipe = load_story_model()
-    # max_length prevents the model from generating text forever
-    story_results = story_pipe(scenario, max_length=100)
-    return story_results[0]['generated_text']
+    
+    # Give the instruction-tuned model a strict prompt
+    safe_prompt = f"Write a sweet, magical, and G-rated bedtime story for a 5-year-old child about this scenario: {scenario}. Make it between 50 and 100 words."
+    
+    # max_new_tokens is used instead of max_length for text2text models
+    story_results = story_pipe(safe_prompt, max_new_tokens=100)
+    story = story_results[0]['generated_text']
+
+    # --- The Safety Net (Option 3 applied) ---
+    blocklist = ['cigarette', 'marijuana', 'smoke', 'drunk', 'blood', 'gun', 'kill', 'drugs', 'die', 'murder']
+    
+    # Check if any bad word is in the lowercased story
+    if any(bad_word in story.lower() for bad_word in blocklist):
+        # Fallback to a hardcoded safe story if the model makes a mistake
+        return "The brave hero went on a magical adventure, made lots of new friends, and came home safely just in time for a yummy dinner!"
+        
+    return story
 
 
 # ==========================================
