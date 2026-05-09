@@ -3,38 +3,49 @@ from PIL import Image
 from gtts import gTTS
 import io
 import traceback
+import requests
 from huggingface_hub import InferenceClient
 
 # ==========================================
-# 1. IMAGE-TO-TEXT FUNCTION (API VERSION)
+# 1. IMAGE-TO-TEXT FUNCTION (DIRECT HTTP API)
 # ==========================================
 def process_image_to_text(image):
-    """Extracts the scenario from the uploaded picture using the HF API with deep error logging."""
+    """Extracts the scenario by sending a direct HTTP request to bypass library bugs."""
     
-    client = InferenceClient(token=st.secrets["HF_TOKEN"])
-    
-    # Using the 'large' model for better, more accurate descriptions
-    model_id = "Salesforce/blip-image-captioning-large"
+    API_URL = "https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-large"
+    headers = {"Authorization": f"Bearer {st.secrets['HF_TOKEN']}"}
     
     try:
-        # We pass the raw PIL image directly to the client
-        scenario = client.image_to_text(image, model=model_id).lower()
+        # Convert the PIL image into a raw byte array
+        img_byte_arr = io.BytesIO()
+        image.save(img_byte_arr, format=image.format if image.format else 'JPEG')
+        img_bytes = img_byte_arr.getvalue()
+
+        # Send the raw bytes directly to the API endpoint
+        response = requests.post(API_URL, headers=headers, data=img_bytes)
+        result = response.json()
         
-        # Scenario Quarantine (Safety Check)
-        unsafe_words = ['smoke', 'smoking', 'cigarette', 'cigar', 'weed', 'drunk', 'blood', 'gun', 'kill', 'die']
-        if any(bad_word in scenario for bad_word in unsafe_words):
-            return "a brave and friendly magical puppy exploring a beautiful, colorful forest"
+        # Check if the API sent back a proper answer
+        if isinstance(result, list) and len(result) > 0 and "generated_text" in result[0]:
+            scenario = result[0]["generated_text"].lower()
             
-        return scenario
-        
+            # Scenario Quarantine (Safety Check)
+            unsafe_words = ['smoke', 'smoking', 'cigarette', 'cigar', 'weed', 'drunk', 'blood', 'gun', 'kill', 'die']
+            if any(bad_word in scenario for bad_word in unsafe_words):
+                return "a brave and friendly magical puppy exploring a beautiful, colorful forest"
+                
+            return scenario
+            
+        # If the API sends back an error message instead of a list (e.g., model is loading)
+        elif isinstance(result, dict) and "error" in result:
+            st.warning(f"Vision API is waking up... {result['error']}. Please wait 15 seconds and try again!")
+            return "a quiet little garden"
+            
+        else:
+            return "a quiet little garden"
+            
     except Exception as e:
-        # Unmasking the invisible error
-        st.error(f"Vision API Error Type: {type(e).__name__}")
-        st.error(f"Raw Error: {repr(e)}")
-        
-        with st.expander("Click here to see the deep server logs"):
-            st.code(traceback.format_exc())
-            
+        st.error(f"Direct API Error: {str(e)}")
         return "a quiet little garden"
 
 # ==========================================
