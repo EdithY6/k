@@ -1,80 +1,66 @@
 import streamlit as st
-import torch
 from transformers import pipeline
 from PIL import Image
 from gtts import gTTS
 import io
+from huggingface_hub import InferenceClient # <--- NEW IMPORT
 
 # ==========================================
 # 1. IMAGE-TO-TEXT FUNCTION
 # ==========================================
 def process_image_to_text(image):
-    """Processes the image and enforces a strict Scenario Quarantine for safety."""
-    
-    # Load model only once using session state for speed
     if 'image_model' not in st.session_state:
         st.session_state.image_model = pipeline("image-to-text", model="Salesforce/blip-image-captioning-base")
     
     scenario = st.session_state.image_model(image)[0]["generated_text"].lower()
     
-    # Scenario Quarantine
     unsafe_words = ['smoke', 'smoking', 'cigarette', 'cigar', 'weed', 'drunk', 'blood', 'gun', 'kill', 'die']
-    
-    # If ANY bad word is found, we completely replace the scenario
     if any(bad_word in scenario for bad_word in unsafe_words):
         return "a brave and friendly magical puppy exploring a beautiful, colorful forest"
         
     return scenario
 
 # ==========================================
-# 2. STORY GENERATION FUNCTION
+# 2. STORY GENERATION FUNCTION (API VERSION)
 # ==========================================
 def generate_story(scenario):
-    """Generates a vivid story using the fine-tuned Mistral model."""
+    """Generates a vivid story using the Hugging Face Server API."""
     
-    if 'story_model' not in st.session_state:
-        # Changed to text-generation for Mistral and added memory optimizations
-        st.session_state.story_model = pipeline(
-            "text-generation", 
-            model="ajibawa-2023/Young-Children-Storyteller-Mistral-7B",
-            torch_dtype=torch.float16, # Reduces memory usage by half
-            device_map="auto"          # Automatically uses GPU if available
+    # Initialize the API client using your Streamlit Secret
+    client = InferenceClient(token=st.secrets["HF_TOKEN"])
+    
+    # We use the official Mistral Instruct model, as it is always active on the free API
+    model_id = "mistralai/Mistral-7B-Instruct-v0.2"
+    
+    # We use Mistral's [INST] tags to force it into the storyteller persona
+    prompt = f"<s>[INST] You are a wonderful, creative children's storyteller. Write an exciting, vivid bedtime story (about 50 to 100 words) based strictly on this scenario: {scenario}. [/INST]"
+    
+    # Call the Hugging Face API instead of running it locally
+    try:
+        response = client.text_generation(
+            prompt,
+            model=model_id,
+            max_new_tokens=150,
+            temperature=0.7
         )
-    
-    prompt = f"Write an exciting, vivid children's bedtime story about this scenario: {scenario}."
-    
-    # Generate the story
-    story_results = st.session_state.story_model(
-        prompt, 
-        max_new_tokens=150, 
-        return_full_text=False, # Prevents the model from repeating the prompt in the output
-        do_sample=True,         # Enables creative variation
-        temperature=0.7         # Balances creativity and coherence
-    )
-    return story_results[0]['generated_text']
+        return response.strip()
+    except Exception as e:
+        return f"Oops! The storyteller is taking a nap. (API Error: {str(e)})"
 
 # ==========================================
 # 3. STORY-TO-AUDIO FUNCTION
 # ==========================================
 def convert_story_to_audio(story_text):
-    """Uses gTTS for lightning-fast text-to-speech conversion."""
-    
-    # Generate the audio instantly using Google's TTS module
     tts = gTTS(text=story_text, lang='en', slow=False)
-    
-    # Save the audio to a temporary memory buffer instead of the hard drive
     audio_buffer = io.BytesIO()
     tts.write_to_fp(audio_buffer)
     audio_buffer.seek(0)
-    
     return audio_buffer
 
 # ==========================================
 # 4. MAIN APPLICATION FUNCTION
 # ==========================================
 def main():
-    """Handles the user-friendly Streamlit UI and executes the pipelines."""
-    
     st.set_page_config(page_title="Magic Story Machine", page_icon="🪄")
     st.header("Turn Your Image into a Magic Story!")
     
@@ -86,25 +72,18 @@ def main():
 
         with st.spinner("Processing your magic story... Please wait!"):
             
-            # --- Stage 1: Image to Text ---
             st.text('👀 Looking closely at the image...')
             scenario = process_image_to_text(image)
             
-            # --- Stage 2: Text to Story ---
             st.text('✍️ Writing a vivid adventure...')
             story = generate_story(scenario)
             st.write(f"**📖 The Story:**\n\n{story}")
 
-            # --- Stage 3: Story to Audio ---
             st.text('🗣️ Recording the storyteller...')
             audio_file = convert_story_to_audio(story)
 
-        # Output the audio player
         st.success("Your story is ready! Hit play to listen.")
         st.audio(audio_file, format="audio/mp3")
 
-# ==========================================
-# EXECUTE THE APP
-# ==========================================
 if __name__ == "__main__":
     main()
