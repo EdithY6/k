@@ -2,27 +2,23 @@ import streamlit as st
 from PIL import Image
 from gtts import gTTS
 import io
+import traceback
 from huggingface_hub import InferenceClient
 
 # ==========================================
 # 1. IMAGE-TO-TEXT FUNCTION (API VERSION)
 # ==========================================
 def process_image_to_text(image):
-    """Extracts the scenario from the uploaded picture using the HF API."""
+    """Extracts the scenario from the uploaded picture using the HF API with deep error logging."""
     
     client = InferenceClient(token=st.secrets["HF_TOKEN"])
     
-    # Upgrading to the 'large' model for better, more accurate descriptions
+    # Using the 'large' model for better, more accurate descriptions
     model_id = "Salesforce/blip-image-captioning-large"
     
     try:
-        # Converting the PIL Image to raw bytes. The API handles bytes much better!
-        img_byte_arr = io.BytesIO()
-        image.save(img_byte_arr, format=image.format if image.format else 'JPEG')
-        img_bytes = img_byte_arr.getvalue()
-
-        # Send the image bytes to the server
-        scenario = client.image_to_text(img_bytes, model=model_id).lower()
+        # We pass the raw PIL image directly to the client
+        scenario = client.image_to_text(image, model=model_id).lower()
         
         # Scenario Quarantine (Safety Check)
         unsafe_words = ['smoke', 'smoking', 'cigarette', 'cigar', 'weed', 'drunk', 'blood', 'gun', 'kill', 'die']
@@ -32,20 +28,25 @@ def process_image_to_text(image):
         return scenario
         
     except Exception as e:
-        # Instead of failing silently, we now print the actual error to Streamlit so you know what's wrong
-        st.error(f"Vision API Error: {str(e)}")
-        return "a quiet little garden" # Shorter fallback
+        # Unmasking the invisible error
+        st.error(f"Vision API Error Type: {type(e).__name__}")
+        st.error(f"Raw Error: {repr(e)}")
+        
+        with st.expander("Click here to see the deep server logs"):
+            st.code(traceback.format_exc())
+            
+        return "a quiet little garden"
 
 # ==========================================
 # 2. STORY GENERATION FUNCTION (API VERSION)
 # ==========================================
 def generate_story(scenario):
-    """Generates a vivid story using the Hugging Face Server API."""
+    """Generates a vivid story using the Hugging Face Server API (Chat Format)."""
     
     client = InferenceClient(token=st.secrets["HF_TOKEN"])
     model_id = "mistralai/Mistral-7B-Instruct-v0.2"
     
-    # I added a strict rule to the system prompt to ensure grammatical endings
+    # Strict rule in the system prompt to ensure grammatical endings
     messages = [
         {
             "role": "system", 
@@ -61,7 +62,7 @@ def generate_story(scenario):
         response = client.chat_completion(
             messages=messages,
             model=model_id,
-            max_tokens=250,  # INCREASED from 150 to prevent the "guillotine" cut-off
+            max_tokens=250,  # Increased to prevent the "guillotine" cut-off
             temperature=0.7  
         )
         return response.choices[0].message.content.strip()
