@@ -43,9 +43,10 @@ def generate_story(scenario):
                 "You are a highly creative but concise children's storyteller. "
                 "Write a very short, exciting bedtime story. "
                 "STRICT RULES: "
-                "1. The story MUST be under 100 words. "
+                "1. The story MUST be under 200 words. "
                 "2. You MUST reach a satisfying conclusion. "
                 "3. End the story properly with a final, complete sentence."
+                "4. Don't end with "The End"."
             )
         },
         {
