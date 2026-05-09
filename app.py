@@ -151,7 +151,7 @@ def main():
         </style>
         """, unsafe_allow_html=True)
 
-    st.title("🪄 Magic Story Machine")
+    st.title("🪄 Magic Story Hub")
     st.write("🌈 **Upload a picture and watch it turn into a magical adventure!**")
     
     uploaded_file = st.file_uploader("Pick a picture from your computer!", type=["jpg", "jpeg", "png"])
