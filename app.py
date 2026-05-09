@@ -1,30 +1,32 @@
 import streamlit as st
-from transformers import pipeline
 from PIL import Image
 from gtts import gTTS
 import io
 from huggingface_hub import InferenceClient
 
 # ==========================================
-# 1. IMAGE-TO-TEXT FUNCTION
+# 1. IMAGE-TO-TEXT FUNCTION (API VERSION)
 # ==========================================
 def process_image_to_text(image):
-    """Processes the image and enforces a strict Scenario Quarantine for safety."""
+    """Extracts the scenario from the uploaded picture using the HF API."""
     
-    # Load model only once using session state for speed
-    if 'image_model' not in st.session_state:
-        st.session_state.image_model = pipeline("image-to-text", model="Salesforce/blip-image-captioning-base")
+    client = InferenceClient(token=st.secrets["HF_TOKEN"])
+    model_id = "Salesforce/blip-image-captioning-base"
     
-    scenario = st.session_state.image_model(image)[0]["generated_text"].lower()
-    
-    # Scenario Quarantine
-    unsafe_words = ['smoke', 'smoking', 'cigarette', 'cigar', 'weed', 'drunk', 'blood', 'gun', 'kill', 'die']
-    
-    # If ANY bad word is found, we completely replace the scenario
-    if any(bad_word in scenario for bad_word in unsafe_words):
-        return "a brave and friendly magical puppy exploring a beautiful, colorful forest"
+    try:
+        # Send the image to the Hugging Face server to extract the caption
+        scenario = client.image_to_text(image, model=model_id).lower()
         
-    return scenario
+        # Scenario Quarantine (Safety Check)
+        unsafe_words = ['smoke', 'smoking', 'cigarette', 'cigar', 'weed', 'drunk', 'blood', 'gun', 'kill', 'die']
+        if any(bad_word in scenario for bad_word in unsafe_words):
+            return "a brave and friendly magical puppy exploring a beautiful, colorful forest"
+            
+        return scenario
+        
+    except Exception as e:
+        # Fallback scenario if the API hiccups
+        return "a beautiful, mysterious garden filled with friendly animals"
 
 # ==========================================
 # 2. STORY GENERATION FUNCTION (API VERSION)
@@ -32,28 +34,21 @@ def process_image_to_text(image):
 def generate_story(scenario):
     """Generates a vivid story using the Hugging Face Server API (Chat Format)."""
     
-    # Initialize the API client using your Streamlit Secret
     client = InferenceClient(token=st.secrets["HF_TOKEN"])
-    
-    # We use the official Mistral Instruct model, as it is always active on the free API
     model_id = "mistralai/Mistral-7B-Instruct-v0.2"
     
-    # For conversational models, we use a 'messages' list instead of a raw string
     messages = [
         {"role": "system", "content": "You are a wonderful, creative children's storyteller. Write an exciting, vivid bedtime story (about 50 to 100 words)."},
         {"role": "user", "content": f"Write a story based strictly on this scenario: {scenario}"}
     ]
     
     try:
-        # Use chat_completion instead of text_generation
         response = client.chat_completion(
             messages=messages,
             model=model_id,
-            max_tokens=150,  # Limits the length of the generated story
-            temperature=0.7  # Balances creativity and coherence
+            max_tokens=150,  
+            temperature=0.7  
         )
-        
-        # Extract the story text from the chat response structure
         return response.choices[0].message.content.strip()
         
     except Exception as e:
@@ -65,10 +60,7 @@ def generate_story(scenario):
 def convert_story_to_audio(story_text):
     """Uses gTTS for lightning-fast text-to-speech conversion."""
     
-    # Generate the audio instantly using Google's TTS module
     tts = gTTS(text=story_text, lang='en', slow=False)
-    
-    # Save the audio to a temporary memory buffer instead of the hard drive
     audio_buffer = io.BytesIO()
     tts.write_to_fp(audio_buffer)
     audio_buffer.seek(0)
@@ -92,16 +84,17 @@ def main():
 
         with st.spinner("Processing your magic story... Please wait!"):
             
-            # --- Stage 1: Image to Text ---
+            # --- Stage 1: Extract Scenario from Picture ---
             st.text('👀 Looking closely at the image...')
             scenario = process_image_to_text(image)
+            st.info(f"**Extracted Scenario:** {scenario.capitalize()}") # Added this so you can see what the AI saw!
             
-            # --- Stage 2: Text to Story ---
+            # --- Stage 2: Write Story based on Scenario ---
             st.text('✍️ Writing a vivid adventure...')
             story = generate_story(scenario)
             st.write(f"**📖 The Story:**\n\n{story}")
 
-            # --- Stage 3: Story to Audio ---
+            # --- Stage 3: Convert to Audio ---
             st.text('🗣️ Recording the storyteller...')
             audio_file = convert_story_to_audio(story)
 
