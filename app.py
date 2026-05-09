@@ -6,18 +6,28 @@ import io
 from huggingface_hub import InferenceClient
 
 # ==========================================
-# 1. IMAGE-TO-TEXT FUNCTION (LOCAL - CACHED)
+# 1. IMAGE-TO-TEXT FUNCTION (VQA INTERROGATION)
 # ==========================================
-# We cache the model so Streamlit doesn't redownload it every time you press a button
+# Switched from passive captioning to Active VQA!
 @st.cache_resource
 def load_vision_model():
-    return pipeline("image-to-text", model="Salesforce/blip-image-captioning-base")
+    return pipeline("visual-question-answering", model="Salesforce/blip-vqa-base")
 
 def process_image_to_text(image):
-    """Extracts the scenario locally without relying on the Hugging Face API."""
+    """Extracts the scenario by actively interrogating the image."""
     
     vision_model = load_vision_model()
-    scenario = vision_model(image)[0]["generated_text"].lower()
+    
+    # 1. Force the AI to focus on the character first
+    q_character = "What is the person in the foreground doing?"
+    character_action = vision_model(image, question=q_character)[0]["answer"]
+    
+    # 2. Ask what is happening around them
+    q_background = "What is in the background?"
+    background_setting = vision_model(image, question=q_background)[0]["answer"]
+    
+    # 3. Stitch the answers together into a highly focused scenario
+    scenario = f"A character is {character_action}, with {background_setting} in the background".lower()
     
     # Scenario Quarantine (Safety Check)
     unsafe_words = ['smoke', 'smoking', 'cigarette', 'cigar', 'weed', 'drunk', 'blood', 'gun', 'kill', 'die']
@@ -35,7 +45,6 @@ def generate_story(scenario):
     client = InferenceClient(token=st.secrets["HF_TOKEN"])
     model_id = "mistralai/Mistral-7B-Instruct-v0.2"
     
-    # Aggressively strict system prompt to enforce length and completion
     messages = [
         {
             "role": "system", 
@@ -56,7 +65,6 @@ def generate_story(scenario):
     ]
     
     try:
-        # Give it a generous token limit, but strict word instructions
         response = client.chat_completion(
             messages=messages,
             model=model_id,
@@ -67,7 +75,6 @@ def generate_story(scenario):
         story = response.choices[0].message.content.strip()
         
         # --- THE PYTHON SAFETY NET ---
-        # If the model still leaves a hanging sentence, trim it cleanly.
         valid_endings = ('.', '!', '?', '"', "'", '”', '’')
         if not story.endswith(valid_endings):
             last_period = story.rfind('. ')
@@ -114,8 +121,8 @@ def main():
 
         with st.spinner("Processing your magic story... Please wait!"):
             
-            # --- Stage 1: Extract Scenario from Picture (LOCAL) ---
-            st.text('👀 Looking closely at the image...')
+            # --- Stage 1: Extract Scenario from Picture (LOCAL VQA) ---
+            st.text('👀 Interrogating the image...')
             scenario = process_image_to_text(image)
             st.info(f"**What the AI sees:** {scenario.capitalize()}")
             
