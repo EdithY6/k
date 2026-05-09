@@ -12,9 +12,14 @@ from huggingface_hub import InferenceClient
 def process_image_to_text(image):
     """Extracts the scenario with strict HTTP status checking to prevent JSON crashes."""
     
-    # Swapped 'large' to 'base' so the free Hugging Face API accepts the request
-    API_URL = "https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-base"
-    headers = {"Authorization": f"Bearer {st.secrets['HF_TOKEN']}"}
+    # Swapped to Hugging Face's official, permanent free-tier vision model
+    API_URL = "https://api-inference.huggingface.co/models/nlpconnect/vit-gpt2-image-captioning"
+    
+    # Added Content-Type so the server knows exactly what kind of file it is receiving
+    headers = {
+        "Authorization": f"Bearer {st.secrets['HF_TOKEN']}",
+        "Content-Type": "application/octet-stream"
+    }
     
     try:
         # Convert the PIL image into a raw byte array
