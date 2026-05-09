@@ -6,15 +6,18 @@ import io
 from huggingface_hub import InferenceClient
 
 # ==========================================
-# 1. VISION ENGINE (Local VQA Interrogation)
+# 1. VISION ENGINE (Local VQA)
 # ==========================================
 @st.cache_resource
 def load_vision_model():
+    """Loads the VQA model into local memory and caches it."""
     return pipeline("visual-question-answering", model="Salesforce/blip-vqa-base")
 
 def process_image_to_text(image):
+    """Interrogates the image for storytelling attributes."""
     vision_model = load_vision_model()
     
+    # Extracting Subject, Action, Setting, and Color/Mood
     q_subject = "Who or what is the main character?"
     subject = vision_model(image, question=q_subject)[0]["answer"]
     
@@ -27,9 +30,10 @@ def process_image_to_text(image):
     q_flavor = "What are the most prominent colors or objects?"
     flavor = vision_model(image, question=q_flavor)[0]["answer"]
     
+    # Final synthesized scenario string
     scenario = f"The scene features {subject} actively {action}. It takes place in a setting with {setting}, highlighted by {flavor}."
     
-    # Safety Check
+    # Content Safety Filter
     unsafe_words = ['smoke', 'smoking', 'cigarette', 'cigar', 'weed', 'drunk', 'blood', 'gun', 'kill', 'die']
     if any(word in scenario.lower() for word in unsafe_words):
         return "a brave and friendly magical puppy exploring a beautiful, colorful forest"
@@ -37,16 +41,20 @@ def process_image_to_text(image):
     return scenario
 
 # ==========================================
-# 2. STORY ENGINE (Mistral API + Scrubber)
+# 2. STORY ENGINE (Mistral API)
 # ==========================================
 def generate_story(scenario):
+    """Generates the story and scrubs it for a clean ending."""
     client = InferenceClient(token=st.secrets["HF_TOKEN"])
     model_id = "mistralai/Mistral-7B-Instruct-v0.2"
     
     messages = [
         {
             "role": "system", 
-            "content": "You are a master storyteller for kids 3-10. Write a 1-paragraph story (max 150 words). No meta-talk."
+            "content": (
+                "You are a master children's storyteller. Write a short, vivid bedtime story in 1-2 paragraphs. "
+                "STRICT RULES: 1. Max 150 words. 2. Clear conclusion. 3. No meta-talk or 'The End'."
+            )
         },
         {
             "role": "user", 
@@ -58,16 +66,19 @@ def generate_story(scenario):
         response = client.chat_completion(messages=messages, model=model_id, max_tokens=350, temperature=0.7)
         story = response.choices[0].message.content.strip()
         
-        # Cleanup
+        # --- TEXT CLEANING ---
+        # Removing unwanted AI commentary or "The End" headers
         unwanted = ["The end.", "The End.", "THE END.", "(I know", "Note:"]
         for item in unwanted:
             if item in story: story = story.split(item)[0].strip()
         
+        # Punctuation check to avoid hanging sentences
         valid_endings = ('.', '!', '?', '"', "”")
         if not story.endswith(valid_endings):
             last_punc = max(story.rfind('.'), story.rfind('!'), story.rfind('?'))
             if last_punc != -1: story = story[:last_punc + 1]
 
+        # Trimming dangling conjunctions (e.g., "...and then a")
         words = story.split()
         if words:
             conjunctions = ['as', 'and', 'with', 'but', 'or', 'a', 'the', 'of']
@@ -77,12 +88,13 @@ def generate_story(scenario):
                 
         return story
     except Exception:
-        return "Once upon a time, a magical star twinkled, and everyone lived happily ever after."
+        return "Once upon a time, a magical wind blew and everyone lived happily ever after."
 
 # ==========================================
 # 3. VOICE ENGINE (gTTS)
 # ==========================================
 def convert_story_to_audio(story_text):
+    """Converts the story text into an MP3 file buffer."""
     tts = gTTS(text=story_text, lang='en', slow=False)
     audio_buffer = io.BytesIO()
     tts.write_to_fp(audio_buffer)
@@ -90,55 +102,26 @@ def convert_story_to_audio(story_text):
     return audio_buffer
 
 # ==========================================
-# 4. FRONT-END (High-Contrast Mode)
+# 4. FRONT-END (Streamlit UI)
 # ==========================================
 def main():
     st.set_page_config(page_title="Magic Story Hub", page_icon="🪄")
 
+    # Injecting Custom CSS for kid-friendly aesthetics
     st.markdown("""
         <style>
-        /* --- GLOBAL & LIGHT MODE --- */
         .stApp { background-color: #f0faff; }
         h1 { color: #ff4b4b; font-family: 'Comic Sans MS', cursive; text-align: center; }
-        
-        /* Vision Box (Light) */
-        .vision-box {
-            background-color: #e8f4f8; padding: 15px; border-radius: 10px;
-            border-left: 5px solid #2e86de; margin-bottom: 20px; color: #2e86de;
-        }
-        
-        /* Story Box (Light) */
-        .story-box {
-            background-color: white; padding: 25px; border-radius: 15px;
-            border-left: 10px solid #ff4b4b; box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
-            color: #333 !important;
-        }
-
         div.stButton > button:first-child {
             background-color: #ff4b4b; color: white; border-radius: 20px; font-weight: bold; width: 100%;
         }
-
-        /* --- DARK MODE OVERRIDES (High Contrast) --- */
-        @media (prefers-color-scheme: dark) {
-            .stApp { background-color: #0e1117; }
-            
-            /* Story Box (Dark): White text on Dark Gray */
-            .story-box { 
-                background-color: #262730; 
-                color: #ffffff !important; 
-                box-shadow: 2px 2px 15px rgba(0,0,0,0.5);
-            }
-            
-            /* Vision Box (Dark): Light Cyan on Deep Navy */
-            .vision-box { 
-                background-color: #1a1c23; 
-                color: #a5d8ff !important; 
-                border-left-color: #339af0;
-            }
-            
-            /* Ensure generic text is readable */
-            .stMarkdown p, .stMarkdown h3, .stMarkdown span { color: #ffffff !important; }
-            h1 { color: #ff4b4b !important; }
+        .vision-box {
+            background-color: #e8f4f8; padding: 15px; border-radius: 10px;
+            border-left: 5px solid #2e86de; margin-bottom: 20px; font-size: 0.9rem;
+        }
+        .story-box {
+            background-color: white; padding: 25px; border-radius: 15px;
+            border-left: 10px solid #ff4b4b; box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
         }
         </style>
         """, unsafe_allow_html=True)
@@ -153,12 +136,18 @@ def main():
         st.image(image, caption="Your Magic Image", use_container_width=True)
 
         if st.button("✨ Make the Magic Happen!"):
-            with st.spinner("🌟 Writing your story..."):
+            with st.spinner("🌟 The forest spirits are reading your picture..."):
+                
+                # Execution Pipeline
                 scenario = process_image_to_text(image)
                 story = generate_story(scenario)
                 audio_file = convert_story_to_audio(story)
 
+                # --- DISPLAY ---
+                # Show the AI's internal scenario observation
                 st.markdown(f'<div class="vision-box"><b>👀 The AI Sees:</b><br>{scenario}</div>', unsafe_allow_html=True)
+                
+                # Show the final polished story
                 st.markdown(f'<div class="story-box"><h3>📖 Your Tale:</h3>{story}</div>', unsafe_allow_html=True)
                 
                 st.write("### 🎧 Listen to your story:")
