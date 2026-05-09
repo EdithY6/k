@@ -19,11 +19,11 @@ def process_image_to_text(image):
     vision_model = load_vision_model()
     
     # 1. Force the AI to focus on the character first
-    q_character = "What is the person in the foreground doing?"
+    q_character = "What are the characters in the foreground doing?"
     character_action = vision_model(image, question=q_character)[0]["answer"]
     
     # 2. Ask what is happening around them
-    q_background = "What is in the background?"
+    q_background = "What are in the background?"
     background_setting = vision_model(image, question=q_background)[0]["answer"]
     
     # 3. Stitch the answers together into a highly focused scenario
