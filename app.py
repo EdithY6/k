@@ -16,7 +16,7 @@ def process_image_to_text(image):
     
     scenario = st.session_state.image_model(image)[0]["generated_text"].lower()
     
-    # THE ELEGANT FIX: Complete Scenario Quarantine
+    # Scenario Quarantine
     unsafe_words = ['smoke', 'smoking', 'cigarette', 'cigar', 'weed', 'drunk', 'blood', 'gun', 'kill', 'die']
     
     # If ANY bad word is found, we completely replace the scenario
@@ -33,9 +33,9 @@ def generate_story(scenario):
     
     if 'story_model' not in st.session_state:
         # Using flan-t5-base: faster than 'large' but better at stories than your original model
-        st.session_state.story_model = pipeline("text2text-generation", model="google/flan-t5-base")
+        st.session_state.story_model = pipeline("text2text-generation", model="mistralai/Mistral-7B-v0.1")
     
-    prompt = f"Write an exciting, vivid children's bedtime story about this scenario: {scenario}. Make it exactly three long sentences full of magic and adjectives."
+    prompt = f"Write an exciting, vivid children's bedtime story about this scenario: {scenario}."
     
     story_results = st.session_state.story_model(prompt, max_new_tokens=100)
     return story_results[0]['generated_text']
