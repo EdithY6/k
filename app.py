@@ -1,4 +1,5 @@
 import streamlit as st
+import torch
 from transformers import pipeline
 from PIL import Image
 from gtts import gTTS
@@ -29,22 +30,34 @@ def process_image_to_text(image):
 # 2. STORY GENERATION FUNCTION
 # ==========================================
 def generate_story(scenario):
-    """Generates a vivid story (50-100 words) using the clean scenario[cite: 1]."""
+    """Generates a vivid story using the fine-tuned Mistral model."""
     
     if 'story_model' not in st.session_state:
-        # Using flan-t5-base: faster than 'large' but better at stories than your original model
-        st.session_state.story_model = pipeline("text2text-generation", model="mistralai/Mistral-7B-v0.1")
+        # Changed to text-generation for Mistral and added memory optimizations
+        st.session_state.story_model = pipeline(
+            "text-generation", 
+            model="ajibawa-2023/Young-Children-Storyteller-Mistral-7B",
+            torch_dtype=torch.float16, # Reduces memory usage by half
+            device_map="auto"          # Automatically uses GPU if available
+        )
     
     prompt = f"Write an exciting, vivid children's bedtime story about this scenario: {scenario}."
     
-    story_results = st.session_state.story_model(prompt, max_new_tokens=100)
+    # Generate the story
+    story_results = st.session_state.story_model(
+        prompt, 
+        max_new_tokens=150, 
+        return_full_text=False, # Prevents the model from repeating the prompt in the output
+        do_sample=True,         # Enables creative variation
+        temperature=0.7         # Balances creativity and coherence
+    )
     return story_results[0]['generated_text']
 
 # ==========================================
 # 3. STORY-TO-AUDIO FUNCTION
 # ==========================================
 def convert_story_to_audio(story_text):
-    """Uses gTTS for lightning-fast text-to-speech conversion[cite: 1]."""
+    """Uses gTTS for lightning-fast text-to-speech conversion."""
     
     # Generate the audio instantly using Google's TTS module
     tts = gTTS(text=story_text, lang='en', slow=False)
@@ -60,7 +73,7 @@ def convert_story_to_audio(story_text):
 # 4. MAIN APPLICATION FUNCTION
 # ==========================================
 def main():
-    """Handles the user-friendly Streamlit UI and executes the pipelines[cite: 1]."""
+    """Handles the user-friendly Streamlit UI and executes the pipelines."""
     
     st.set_page_config(page_title="Magic Story Machine", page_icon="🪄")
     st.header("Turn Your Image into a Magic Story!")
