@@ -92,4 +92,25 @@ def main():
 
         with st.spinner("Processing your magic story... Please wait!"):
             
-            # --- Stage 1: Image to Text
+            # --- Stage 1: Image to Text ---
+            st.text('👀 Looking closely at the image...')
+            scenario = process_image_to_text(image)
+            
+            # --- Stage 2: Text to Story ---
+            st.text('✍️ Writing a vivid adventure...')
+            story = generate_story(scenario)
+            st.write(f"**📖 The Story:**\n\n{story}")
+
+            # --- Stage 3: Story to Audio ---
+            st.text('🗣️ Recording the storyteller...')
+            audio_file = convert_story_to_audio(story)
+
+        # Output the audio player
+        st.success("Your story is ready! Hit play to listen.")
+        st.audio(audio_file, format="audio/mp3")
+
+# ==========================================
+# EXECUTE THE APP
+# ==========================================
+if __name__ == "__main__":
+    main()
