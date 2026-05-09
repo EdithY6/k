@@ -10,34 +10,29 @@ from huggingface_hub import InferenceClient
 # ==========================================
 @st.cache_resource
 def load_vision_model():
-    # We use the VQA model to actively interrogate the image
+    # Using VQA to actively interrogation the image for story elements
     return pipeline("visual-question-answering", model="Salesforce/blip-vqa-base")
 
 def process_image_to_text(image):
     """Actively interrogates the image for specific storytelling elements."""
-    
     vision_model = load_vision_model()
     
-    # 1. THE SUBJECT (Who or what is the story about?)
+    # Subject, Action, Setting, and Flavor questions
     q_subject = "Who or what is the main character or subject?"
     subject = vision_model(image, question=q_subject)[0]["answer"]
     
-    # 2. THE ACTION (What is the drama or movement?)
     q_action = "What is the main action taking place?"
     action = vision_model(image, question=q_action)[0]["answer"]
     
-    # 3. THE SETTING (Where does the story happen?)
     q_setting = "Describe the environment, setting, or background."
     setting = vision_model(image, question=q_setting)[0]["answer"]
     
-    # 4. THE FLAVOR (What are the colors, mood, or interesting objects?)
     q_flavor = "What are the most prominent colors or objects in the scene?"
     flavor = vision_model(image, question=q_flavor)[0]["answer"]
     
-    # 5. THE MASTER SCENARIO
     scenario = f"The scene features {subject} actively {action}. It takes place in a setting with {setting}, highlighted by {flavor}."
     
-    # Scenario Quarantine (Safety Check)
+    # Safety Check
     unsafe_words = ['smoke', 'smoking', 'cigarette', 'cigar', 'weed', 'drunk', 'blood', 'gun', 'kill', 'die']
     if any(bad_word in scenario.lower() for bad_word in unsafe_words):
         return "a brave and friendly magical puppy exploring a beautiful, colorful forest"
@@ -62,8 +57,7 @@ def generate_story(scenario):
                 "STRICT RULES: "
                 "1. The story MUST be under 200 words. "
                 "2. You MUST reach a satisfying conclusion. "
-                "3. End the story properly with a final, complete sentence. "
-                "4. Don't end with 'The End'."
+                "3. Conclude the narrative naturally with a final action or thought. Do not include meta-commentary."
             )
         },
         {
@@ -82,7 +76,19 @@ def generate_story(scenario):
         
         story = response.choices[0].message.content.strip()
         
+        # --- POST-PROCESSING SCRUBBER ---
+        # Remove "The end" or sassy AI commentary in Python
+        unwanted_endings = ["The end.", "The End.", "THE END.", "The end", "The End", "THE END"]
+        for ending in unwanted_endings:
+            if story.endswith(ending):
+                story = story[:-len(ending)].strip()
+                
+        # Catch meta-commentary (like sassy parenthetical remarks)
+        if "(" in story and "know" in story:
+            story = story.split("(")[0].strip()
+        
         # --- THE PYTHON SAFETY NET ---
+        # Ensure the story ends on a valid punctuation mark
         valid_endings = ('.', '!', '?', '"', "'", '”', '’')
         if not story.endswith(valid_endings):
             last_period = story.rfind('. ')
@@ -104,20 +110,16 @@ def generate_story(scenario):
 # ==========================================
 def convert_story_to_audio(story_text):
     """Uses gTTS for lightning-fast text-to-speech conversion."""
-    
     tts = gTTS(text=story_text, lang='en', slow=False)
     audio_buffer = io.BytesIO()
     tts.write_to_fp(audio_buffer)
     audio_buffer.seek(0)
-    
     return audio_buffer
 
 # ==========================================
 # 4. MAIN APPLICATION FUNCTION
 # ==========================================
 def main():
-    """Handles the user-friendly Streamlit UI and executes the pipelines."""
-    
     st.set_page_config(page_title="Magic Story Machine", page_icon="🪄")
     st.header("Turn Your Image into a Magic Story!")
     
@@ -129,12 +131,12 @@ def main():
 
         with st.spinner("Processing your magic story... Please wait!"):
             
-            # --- Stage 1: Extract Scenario from Picture (LOCAL VQA) ---
-            st.text('👀 Interrogating the image like a movie director...')
+            # --- Stage 1: Extract Scenario (LOCAL VQA) ---
+            st.text('👀 Interrogating the image...')
             scenario = process_image_to_text(image)
             st.info(f"**What the AI sees:** {scenario}")
             
-            # --- Stage 2: Write Story based on Scenario (API) ---
+            # --- Stage 2: Write Story (API) ---
             st.text('✍️ Writing a vivid adventure...')
             story = generate_story(scenario)
             st.write(f"**📖 The Story:**\n\n{story}")
@@ -146,8 +148,5 @@ def main():
         st.success("Your story is ready! Hit play to listen.")
         st.audio(audio_file, format="audio/mp3")
 
-# ==========================================
-# EXECUTE THE APP
-# ==========================================
 if __name__ == "__main__":
     main()
