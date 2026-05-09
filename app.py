@@ -7,10 +7,10 @@ import requests
 from huggingface_hub import InferenceClient
 
 # ==========================================
-# 1. IMAGE-TO-TEXT FUNCTION (DIRECT HTTP API)
+# 1. IMAGE-TO-TEXT FUNCTION (STRICT HTTP API)
 # ==========================================
 def process_image_to_text(image):
-    """Extracts the scenario by sending a direct HTTP request to bypass library bugs."""
+    """Extracts the scenario with strict HTTP status checking to prevent JSON crashes."""
     
     API_URL = "https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-large"
     headers = {"Authorization": f"Bearer {st.secrets['HF_TOKEN']}"}
@@ -21,11 +21,26 @@ def process_image_to_text(image):
         image.save(img_byte_arr, format=image.format if image.format else 'JPEG')
         img_bytes = img_byte_arr.getvalue()
 
-        # Send the raw bytes directly to the API endpoint
+        # Send request
         response = requests.post(API_URL, headers=headers, data=img_bytes)
-        result = response.json()
         
-        # Check if the API sent back a proper answer
+        # 1. Check if the server gave us a success code (200 OK)
+        if response.status_code != 200:
+            st.error(f"Hugging Face Server Error: HTTP {response.status_code}")
+            with st.expander("Click to see the raw server response"):
+                st.text(response.text) # Prints the HTML or raw text the server sent
+            return "a quiet little garden"
+
+        # 2. Safely try to parse the JSON
+        try:
+            result = response.json()
+        except Exception as json_err:
+            st.error("Server returned jumbled data instead of JSON.")
+            with st.expander("Click to see what the server sent"):
+                st.text(response.text)
+            return "a quiet little garden"
+        
+        # 3. Process the successful result
         if isinstance(result, list) and len(result) > 0 and "generated_text" in result[0]:
             scenario = result[0]["generated_text"].lower()
             
@@ -36,16 +51,17 @@ def process_image_to_text(image):
                 
             return scenario
             
-        # If the API sends back an error message instead of a list (e.g., model is loading)
         elif isinstance(result, dict) and "error" in result:
-            st.warning(f"Vision API is waking up... {result['error']}. Please wait 15 seconds and try again!")
+            st.warning(f"Server says: {result['error']}")
             return "a quiet little garden"
             
         else:
             return "a quiet little garden"
             
     except Exception as e:
-        st.error(f"Direct API Error: {str(e)}")
+        st.error(f"Critical API Error: {str(e)}")
+        with st.expander("Click for full traceback"):
+            st.code(traceback.format_exc())
         return "a quiet little garden"
 
 # ==========================================
