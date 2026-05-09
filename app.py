@@ -1,85 +1,43 @@
 import streamlit as st
+from transformers import pipeline
 from PIL import Image
 from gtts import gTTS
 import io
-import traceback
-import requests
 from huggingface_hub import InferenceClient
 
 # ==========================================
-# 1. IMAGE-TO-TEXT FUNCTION (STRICT HTTP API)
+# 1. IMAGE-TO-TEXT FUNCTION (LOCAL - NO API)
 # ==========================================
+# We cache the model so Streamlit doesn't redownload it every time you press a button
+@st.cache_resource
+def load_vision_model():
+    return pipeline("image-to-text", model="Salesforce/blip-image-captioning-base")
+
 def process_image_to_text(image):
-    """Extracts the scenario with strict HTTP status checking to prevent JSON crashes."""
+    """Extracts the scenario locally without relying on the Hugging Face API."""
     
-    # Swapped to Hugging Face's official, permanent free-tier vision model
-    API_URL = "https://api-inference.huggingface.co/models/nlpconnect/vit-gpt2-image-captioning"
+    # Load the local model
+    vision_model = load_vision_model()
     
-    # Added Content-Type so the server knows exactly what kind of file it is receiving
-    headers = {
-        "Authorization": f"Bearer {st.secrets['HF_TOKEN']}",
-        "Content-Type": "application/octet-stream"
-    }
+    # Generate caption directly from the image
+    scenario = vision_model(image)[0]["generated_text"].lower()
     
-    try:
-        # Convert the PIL image into a raw byte array
-        img_byte_arr = io.BytesIO()
-        image.save(img_byte_arr, format=image.format if image.format else 'JPEG')
-        img_bytes = img_byte_arr.getvalue()
-
-        # Send request
-        response = requests.post(API_URL, headers=headers, data=img_bytes)
+    # Scenario Quarantine (Safety Check)
+    unsafe_words = ['smoke', 'smoking', 'cigarette', 'cigar', 'weed', 'drunk', 'blood', 'gun', 'kill', 'die']
+    if any(bad_word in scenario for bad_word in unsafe_words):
+        return "a brave and friendly magical puppy exploring a beautiful, colorful forest"
         
-        # 1. Check if the server gave us a success code (200 OK)
-        if response.status_code != 200:
-            st.error(f"Hugging Face Server Error: HTTP {response.status_code}")
-            with st.expander("Click to see the raw server response"):
-                st.text(response.text) # Prints the HTML or raw text the server sent
-            return "a quiet little garden"
-
-        # 2. Safely try to parse the JSON
-        try:
-            result = response.json()
-        except Exception as json_err:
-            st.error("Server returned jumbled data instead of JSON.")
-            with st.expander("Click to see what the server sent"):
-                st.text(response.text)
-            return "a quiet little garden"
-        
-        # 3. Process the successful result
-        if isinstance(result, list) and len(result) > 0 and "generated_text" in result[0]:
-            scenario = result[0]["generated_text"].lower()
-            
-            # Scenario Quarantine (Safety Check)
-            unsafe_words = ['smoke', 'smoking', 'cigarette', 'cigar', 'weed', 'drunk', 'blood', 'gun', 'kill', 'die']
-            if any(bad_word in scenario for bad_word in unsafe_words):
-                return "a brave and friendly magical puppy exploring a beautiful, colorful forest"
-                
-            return scenario
-            
-        elif isinstance(result, dict) and "error" in result:
-            st.warning(f"Server says: {result['error']}")
-            return "a quiet little garden"
-            
-        else:
-            return "a quiet little garden"
-            
-    except Exception as e:
-        st.error(f"Critical API Error: {str(e)}")
-        with st.expander("Click for full traceback"):
-            st.code(traceback.format_exc())
-        return "a quiet little garden"
+    return scenario
 
 # ==========================================
 # 2. STORY GENERATION FUNCTION (API VERSION)
 # ==========================================
 def generate_story(scenario):
-    """Generates a vivid story using the Hugging Face Server API (Chat Format)."""
+    """Generates a vivid story using the Hugging Face Server API to save memory."""
     
     client = InferenceClient(token=st.secrets["HF_TOKEN"])
     model_id = "mistralai/Mistral-7B-Instruct-v0.2"
     
-    # Strict rule in the system prompt to ensure grammatical endings
     messages = [
         {
             "role": "system", 
@@ -95,7 +53,7 @@ def generate_story(scenario):
         response = client.chat_completion(
             messages=messages,
             model=model_id,
-            max_tokens=250,  # Increased to prevent the "guillotine" cut-off
+            max_tokens=250, 
             temperature=0.7  
         )
         return response.choices[0].message.content.strip()
@@ -133,12 +91,12 @@ def main():
 
         with st.spinner("Processing your magic story... Please wait!"):
             
-            # --- Stage 1: Extract Scenario from Picture ---
-            st.text('👀 Looking closely at the image...')
+            # --- Stage 1: Extract Scenario from Picture (LOCAL) ---
+            st.text('👀 Looking closely at the image (No API required)...')
             scenario = process_image_to_text(image)
             st.info(f"**What the AI sees:** {scenario.capitalize()}")
             
-            # --- Stage 2: Write Story based on Scenario ---
+            # --- Stage 2: Write Story based on Scenario (API) ---
             st.text('✍️ Writing a vivid adventure...')
             story = generate_story(scenario)
             st.write(f"**📖 The Story:**\n\n{story}")
