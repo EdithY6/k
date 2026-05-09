@@ -36,7 +36,7 @@ def generate_story(scenario):
     model_id = "mistralai/Mistral-7B-Instruct-v0.2"
     
     # Aggressively strict system prompt to enforce length and completion
-    messages = [
+   messages = [
         {
             "role": "system", 
             "content": (
@@ -45,8 +45,8 @@ def generate_story(scenario):
                 "STRICT RULES: "
                 "1. The story MUST be under 200 words. "
                 "2. You MUST reach a satisfying conclusion. "
-                "3. End the story properly with a final, complete sentence."
-                "4. Don't end with "The End"."
+                "3. End the story properly with a final, complete sentence. "
+                "4. Don't end with 'The End'."
             )
         },
         {
