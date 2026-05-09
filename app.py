@@ -152,4 +152,33 @@ def main():
         """, unsafe_allow_html=True)
 
     st.title("🪄 Magic Story Machine")
-    st.write("🌈 **Upload a picture and watch it turn into a
+    st.write("🌈 **Upload a picture and watch it turn into a magical adventure!**")
+    
+    uploaded_file = st.file_uploader("Pick a picture from your computer!", type=["jpg", "jpeg", "png"])
+
+    if uploaded_file is not None:
+        image = Image.open(uploaded_file)
+        st.image(image, caption="Your Magic Image", use_container_width=True)
+
+        if st.button("✨ Make the Magic Happen!"):
+            with st.spinner("🌟 The forest spirits are writing your story..."):
+                
+                # Stage 1: Vision
+                scenario = process_image_to_text(image)
+                
+                # Stage 2: Story
+                story = generate_story(scenario)
+                
+                # Stage 3: Audio
+                audio_file = convert_story_to_audio(story)
+
+                # Display Results using HTML-safe markdown
+                st.markdown(f'<div class="story-box"><h3>📖 Your Tale:</h3>{story}</div>', unsafe_allow_html=True)
+                
+                st.write("---")
+                st.write("### 🎧 Listen to your story:")
+                st.audio(audio_file, format="audio/mp3")
+                st.balloons()
+
+if __name__ == "__main__":
+    main()
