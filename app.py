@@ -6,32 +6,40 @@ import io
 from huggingface_hub import InferenceClient
 
 # ==========================================
-# 1. IMAGE-TO-TEXT FUNCTION (VQA INTERROGATION)
+# 1. IMAGE-TO-TEXT FUNCTION (ADVANCED VQA)
 # ==========================================
-# Switched from passive captioning to Active VQA!
 @st.cache_resource
 def load_vision_model():
+    # We use the VQA model to actively interrogate the image
     return pipeline("visual-question-answering", model="Salesforce/blip-vqa-base")
 
 def process_image_to_text(image):
-    """Extracts the scenario by actively interrogating the image."""
+    """Actively interrogates the image for specific storytelling elements."""
     
     vision_model = load_vision_model()
     
-    # 1. Force the AI to focus on the character first
-    q_character = "What are the characters in the foreground doing?"
-    character_action = vision_model(image, question=q_character)[0]["answer"]
+    # 1. THE SUBJECT (Who or what is the story about?)
+    q_subject = "Who or what is the main character or subject?"
+    subject = vision_model(image, question=q_subject)[0]["answer"]
     
-    # 2. Ask what is happening around them
-    q_background = "What are in the background?"
-    background_setting = vision_model(image, question=q_background)[0]["answer"]
+    # 2. THE ACTION (What is the drama or movement?)
+    q_action = "What is the main action taking place?"
+    action = vision_model(image, question=q_action)[0]["answer"]
     
-    # 3. Stitch the answers together into a highly focused scenario
-    scenario = f"A character is {character_action}, with {background_setting} in the background".lower()
+    # 3. THE SETTING (Where does the story happen?)
+    q_setting = "Describe the environment, setting, or background."
+    setting = vision_model(image, question=q_setting)[0]["answer"]
+    
+    # 4. THE FLAVOR (What are the colors, mood, or interesting objects?)
+    q_flavor = "What are the most prominent colors or objects in the scene?"
+    flavor = vision_model(image, question=q_flavor)[0]["answer"]
+    
+    # 5. THE MASTER SCENARIO
+    scenario = f"The scene features {subject} actively {action}. It takes place in a setting with {setting}, highlighted by {flavor}."
     
     # Scenario Quarantine (Safety Check)
     unsafe_words = ['smoke', 'smoking', 'cigarette', 'cigar', 'weed', 'drunk', 'blood', 'gun', 'kill', 'die']
-    if any(bad_word in scenario for bad_word in unsafe_words):
+    if any(bad_word in scenario.lower() for bad_word in unsafe_words):
         return "a brave and friendly magical puppy exploring a beautiful, colorful forest"
         
     return scenario
@@ -122,9 +130,9 @@ def main():
         with st.spinner("Processing your magic story... Please wait!"):
             
             # --- Stage 1: Extract Scenario from Picture (LOCAL VQA) ---
-            st.text('👀 Interrogating the image...')
+            st.text('👀 Interrogating the image like a movie director...')
             scenario = process_image_to_text(image)
-            st.info(f"**What the AI sees:** {scenario.capitalize()}")
+            st.info(f"**What the AI sees:** {scenario}")
             
             # --- Stage 2: Write Story based on Scenario (API) ---
             st.text('✍️ Writing a vivid adventure...')
