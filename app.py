@@ -36,7 +36,7 @@ def generate_story(scenario):
     model_id = "mistralai/Mistral-7B-Instruct-v0.2"
     
     # Aggressively strict system prompt to enforce length and completion
-   messages = [
+    messages = [
         {
             "role": "system", 
             "content": (
