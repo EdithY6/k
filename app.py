@@ -6,7 +6,7 @@ import io
 from huggingface_hub import InferenceClient
 
 # ==========================================
-# 1. IMAGE-TO-TEXT FUNCTION (LOCAL - NO API)
+# 1. IMAGE-TO-TEXT FUNCTION (LOCAL - CACHED)
 # ==========================================
 # We cache the model so Streamlit doesn't redownload it every time you press a button
 @st.cache_resource
@@ -16,10 +16,7 @@ def load_vision_model():
 def process_image_to_text(image):
     """Extracts the scenario locally without relying on the Hugging Face API."""
     
-    # Load the local model
     vision_model = load_vision_model()
-    
-    # Generate caption directly from the image
     scenario = vision_model(image)[0]["generated_text"].lower()
     
     # Scenario Quarantine (Safety Check)
@@ -33,30 +30,55 @@ def process_image_to_text(image):
 # 2. STORY GENERATION FUNCTION (API VERSION)
 # ==========================================
 def generate_story(scenario):
-    """Generates a vivid story using the Hugging Face Server API to save memory."""
+    """Generates a vivid story and guarantees a complete, grammatically correct ending."""
     
     client = InferenceClient(token=st.secrets["HF_TOKEN"])
     model_id = "mistralai/Mistral-7B-Instruct-v0.2"
     
+    # Aggressively strict system prompt to enforce length and completion
     messages = [
         {
             "role": "system", 
-            "content": "You are a wonderful, creative children's storyteller. Write an exciting, vivid bedtime story (about 50 to 100 words). You MUST ensure the story reaches a natural, complete, and grammatically correct ending."
+            "content": (
+                "You are a highly creative but concise children's storyteller. "
+                "Write a very short, exciting bedtime story. "
+                "STRICT RULES: "
+                "1. The story MUST be under 100 words. "
+                "2. You MUST reach a satisfying conclusion. "
+                "3. End the story properly with a final, complete sentence."
+            )
         },
         {
             "role": "user", 
-            "content": f"Write a complete story based strictly on this scenario: {scenario}"
+            "content": f"Write a complete, short story based strictly on this scenario: {scenario}"
         }
     ]
     
     try:
+        # Give it a generous token limit, but strict word instructions
         response = client.chat_completion(
             messages=messages,
             model=model_id,
-            max_tokens=250, 
+            max_tokens=300,  
             temperature=0.7  
         )
-        return response.choices[0].message.content.strip()
+        
+        story = response.choices[0].message.content.strip()
+        
+        # --- THE PYTHON SAFETY NET ---
+        # If the model still leaves a hanging sentence, trim it cleanly.
+        valid_endings = ('.', '!', '?', '"', "'", '”', '’')
+        if not story.endswith(valid_endings):
+            last_period = story.rfind('. ')
+            last_exclaim = story.rfind('! ')
+            last_question = story.rfind('? ')
+            
+            last_valid_punctuation = max(last_period, last_exclaim, last_question)
+            
+            if last_valid_punctuation != -1:
+                story = story[:last_valid_punctuation + 1]
+                
+        return story
         
     except Exception as e:
         return f"Oops! The storyteller is taking a nap. (API Error: {str(e)})"
@@ -92,7 +114,7 @@ def main():
         with st.spinner("Processing your magic story... Please wait!"):
             
             # --- Stage 1: Extract Scenario from Picture (LOCAL) ---
-            st.text('👀 Looking closely at the image (No API required)...')
+            st.text('👀 Looking closely at the image...')
             scenario = process_image_to_text(image)
             st.info(f"**What the AI sees:** {scenario.capitalize()}")
             
