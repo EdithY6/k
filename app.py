@@ -75,22 +75,24 @@ def generate_story(scenario):
         
         story = response.choices[0].message.content.strip()
         
-        # Scrubbing and Safety Net
+        # --- POST-PROCESSING SCRUBBER ---
         unwanted = ["The end.", "The End.", "THE END.", "(I know", "Note:"]
         for item in unwanted:
             if item in story:
                 story = story.split(item)[0].strip()
         
+        # Ensure it ends on a valid punctuation mark
         valid_endings = ('.', '!', '?', '"', "”")
         if not story.endswith(valid_endings):
             last_punc = max(story.rfind('.'), story.rfind('!'), story.rfind('?'))
             if last_punc != -1:
                 story = story[:last_punc + 1]
 
+        # Final check for dangling words (like "as a")
         words = story.split()
         if words:
-            conjunctions = ['as', 'and', 'with', 'but', 'or', 'a', 'the']
-            while words and (words[-1].lower() in conjunctions or not words[-1][-1] in valid_endings):
+            conjunctions = ['as', 'and', 'with', 'but', 'or', 'a', 'the', 'of']
+            while words and (words[-1].lower() in conjunctions or words[-1][-1] not in valid_endings):
                 words.pop()
             story = " ".join(words)
                 
@@ -114,7 +116,7 @@ def convert_story_to_audio(story_text):
 def main():
     st.set_page_config(page_title="Magic Story Machine", page_icon="🪄")
 
-    # --- CUSTOM STYLING ---
+    # --- CUSTOM STYLING (FIXED unsafe_allow_html) ---
     st.markdown("""
         <style>
         .stApp {
@@ -135,45 +137,19 @@ def main():
             border-radius: 20px;
             border: 2px solid #ff4b4b;
             font-weight: bold;
+            width: 100%;
         }
         .story-box {
             background-color: white;
-            padding: 20px;
+            padding: 25px;
             border-radius: 15px;
             border-left: 10px solid #ff4b4b;
             box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
+            margin-top: 20px;
+            margin-bottom: 20px;
         }
         </style>
-        """, unsafe_values=True)
+        """, unsafe_allow_html=True)
 
     st.title("🪄 Magic Story Machine")
-    st.write("🌈 **Upload a picture and watch it turn into a magical adventure!**")
-    
-    uploaded_file = st.file_uploader("Pick a picture from your computer!", type=["jpg", "jpeg", "png"])
-
-    if uploaded_file is not None:
-        image = Image.open(uploaded_file)
-        st.image(image, caption="Your Magic Image", use_container_width=True)
-
-        if st.button("✨ Make the Magic Happen!"):
-            with st.spinner("🌟 The forest spirits are writing your story..."):
-                
-                # Stage 1: Vision
-                scenario = process_image_to_text(image)
-                
-                # Stage 2: Story
-                story = generate_story(scenario)
-                
-                # Stage 3: Audio
-                audio_file = convert_story_to_audio(story)
-
-                # Display Results
-                st.markdown(f'<div class="story-box"><h3>📖 Your Tale:</h3>{story}</div>', unsafe_html=True)
-                
-                st.write("---")
-                st.write("### 🎧 Listen to your story:")
-                st.audio(audio_file, format="audio/mp3")
-                st.balloons()
-
-if __name__ == "__main__":
-    main()
+    st.write("🌈 **Upload a picture and watch it turn into a
