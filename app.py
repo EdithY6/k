@@ -12,7 +12,8 @@ from huggingface_hub import InferenceClient
 def process_image_to_text(image):
     """Extracts the scenario with strict HTTP status checking to prevent JSON crashes."""
     
-    API_URL = "https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-large"
+    # Swapped 'large' to 'base' so the free Hugging Face API accepts the request
+    API_URL = "https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-base"
     headers = {"Authorization": f"Bearer {st.secrets['HF_TOKEN']}"}
     
     try:
