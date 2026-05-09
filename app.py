@@ -11,11 +11,18 @@ def process_image_to_text(image):
     """Extracts the scenario from the uploaded picture using the HF API."""
     
     client = InferenceClient(token=st.secrets["HF_TOKEN"])
-    model_id = "Salesforce/blip-image-captioning-base"
+    
+    # Upgrading to the 'large' model for better, more accurate descriptions
+    model_id = "Salesforce/blip-image-captioning-large"
     
     try:
-        # Send the image to the Hugging Face server to extract the caption
-        scenario = client.image_to_text(image, model=model_id).lower()
+        # Converting the PIL Image to raw bytes. The API handles bytes much better!
+        img_byte_arr = io.BytesIO()
+        image.save(img_byte_arr, format=image.format if image.format else 'JPEG')
+        img_bytes = img_byte_arr.getvalue()
+
+        # Send the image bytes to the server
+        scenario = client.image_to_text(img_bytes, model=model_id).lower()
         
         # Scenario Quarantine (Safety Check)
         unsafe_words = ['smoke', 'smoking', 'cigarette', 'cigar', 'weed', 'drunk', 'blood', 'gun', 'kill', 'die']
@@ -25,28 +32,36 @@ def process_image_to_text(image):
         return scenario
         
     except Exception as e:
-        # Fallback scenario if the API hiccups
-        return "a beautiful, mysterious garden filled with friendly animals"
+        # Instead of failing silently, we now print the actual error to Streamlit so you know what's wrong
+        st.error(f"Vision API Error: {str(e)}")
+        return "a quiet little garden" # Shorter fallback
 
 # ==========================================
 # 2. STORY GENERATION FUNCTION (API VERSION)
 # ==========================================
 def generate_story(scenario):
-    """Generates a vivid story using the Hugging Face Server API (Chat Format)."""
+    """Generates a vivid story using the Hugging Face Server API."""
     
     client = InferenceClient(token=st.secrets["HF_TOKEN"])
     model_id = "mistralai/Mistral-7B-Instruct-v0.2"
     
+    # I added a strict rule to the system prompt to ensure grammatical endings
     messages = [
-        {"role": "system", "content": "You are a wonderful, creative children's storyteller. Write an exciting, vivid bedtime story (about 50 to 100 words)."},
-        {"role": "user", "content": f"Write a story based strictly on this scenario: {scenario}"}
+        {
+            "role": "system", 
+            "content": "You are a wonderful, creative children's storyteller. Write an exciting, vivid bedtime story (about 50 to 100 words). You MUST ensure the story reaches a natural, complete, and grammatically correct ending."
+        },
+        {
+            "role": "user", 
+            "content": f"Write a complete story based strictly on this scenario: {scenario}"
+        }
     ]
     
     try:
         response = client.chat_completion(
             messages=messages,
             model=model_id,
-            max_tokens=150,  
+            max_tokens=250,  # INCREASED from 150 to prevent the "guillotine" cut-off
             temperature=0.7  
         )
         return response.choices[0].message.content.strip()
@@ -87,7 +102,7 @@ def main():
             # --- Stage 1: Extract Scenario from Picture ---
             st.text('👀 Looking closely at the image...')
             scenario = process_image_to_text(image)
-            st.info(f"**Extracted Scenario:** {scenario.capitalize()}") # Added this so you can see what the AI saw!
+            st.info(f"**What the AI sees:** {scenario.capitalize()}")
             
             # --- Stage 2: Write Story based on Scenario ---
             st.text('✍️ Writing a vivid adventure...')
@@ -98,7 +113,6 @@ def main():
             st.text('🗣️ Recording the storyteller...')
             audio_file = convert_story_to_audio(story)
 
-        # Output the audio player
         st.success("Your story is ready! Hit play to listen.")
         st.audio(audio_file, format="audio/mp3")
 
